@@ -1,6 +1,31 @@
+# Environment & Secrets
 .env
 .env.*
-.auth/
+.env.local
+.env.production
+secrets.py
+config.ini
+appsettings.json
+
+# IDE & Editor specific files
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Runtime & Dependency files
 __pycache__/
 *.pyc
+*.pyo
+venv/
+.venv/
+node_modules/
 .pytest_cache/
+.coverage
+htmlcov/
+
+# Framework-specific (e.g., Playwright)
+.playwright/
+.auth/
+test-results/
+playwright-report/
