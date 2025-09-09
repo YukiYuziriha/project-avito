@@ -1,0 +1,15 @@
+{
+  "explorer.fileNesting.enabled": true,
+  "explorer.fileNesting.patterns": {
+    ".gitignore": ".gitattributes, .gitmodules, .gitmessage, .mailmap, .git-blame*",
+    "*.py": "$(capture).pyi, $(capture).pyc, $(capture).pyd, __pycache__, py.typed",
+    "conftest.py": "pytest.ini, tox.ini, .coveragerc",
+    "requirements.txt": "requirements*.txt, requirements/*, pip.conf, .env, .env.*",
+    "playwright.yml": "github/, .github/*.yml, .github/*.yaml"
+  },
+  "folders": [
+    {
+      "path": "."
+    }
+  ]
+}

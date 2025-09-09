@@ -1,0 +1,27 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Python: Debug Pytest",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/venv/bin/pytest", // Adjust path to your pytest if needed
+      "args": [
+        "-x", // stop on first failure
+        "-v", // verbose output
+        "-s", // print stdout (print statements)
+        "${file}" // run tests in the current file
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": false // Important: allows debugging into Playwright library code
+    },
+    {
+      "name": "Python: Current File",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal",
+      "justMyCode": false
+    }
+  ]
+}

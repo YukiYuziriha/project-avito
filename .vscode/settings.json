@@ -1,0 +1,20 @@
+{
+  "python.testing.pytestEnabled": true,
+  "python.testing.unittestEnabled": false,
+  "python.testing.autoTestDiscoverOnSaveEnabled": true,
+  "python.analysis.autoImportCompletions": true,
+  "python.analysis.typeCheckingMode": "basic", // Catches basic type errors
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.black-formatter",
+    "editor.formatOnSave": true, // Automatically format code on save
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "explicit" // Automatically clean up imports on save
+    }
+  },
+  "files.exclude": { // Hide clutter from your sidebar
+    "**/__pycache__": true,
+    "**/.pytest_cache": true,
+    "**/.hypothesis": true,
+    "**/*.pyc": true
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "buyer": {
+    "username": "test_user",
+    "password": "buyer_password"
+  },
+  "seller": {
+    "username": "test_seller@example.com",
+    "password": "seller_password"
+  }
+}
