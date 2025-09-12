@@ -4,118 +4,133 @@ from pathlib import Path
 import pytest
 from playwright.sync_api import Browser, Page
 from dotenv import load_dotenv, find_dotenv
+from filelock import FileLock, Timeout
 
 # --- Paths / env -------------------------------------------------------------
 ROOT = Path(__file__).resolve().parent
-load_dotenv(find_dotenv())                    # keep for other fixtures if needed
+load_dotenv(find_dotenv())
 AUTH_DIR = ROOT / ".auth"
 AUTH_DIR.mkdir(exist_ok=True)
 DATA_DIR = ROOT / "test_data"
 USERS_JSON = DATA_DIR / "test_users.json"
 
-# Remember which roles we've already validated this session
+# Remember which profiles we've already validated this session
 _STATE_VALIDATED: dict[str, bool] = {}
 
+
 # --- Small helpers (no login attempts here) ----------------------------------
-def _state_file_for(role: str) -> Path:
-    return AUTH_DIR / f"{role}.json"
+def _state_file_for(profile: str) -> Path:
+    """Generates the expected path for a profile's saved auth state."""
+    return AUTH_DIR / f"{profile}.json"
+
 
 def _click_continue_if_present(page: Page) -> None:
+    """Clicks the 'Continue' button if it appears after navigation."""
     try:
         page.get_by_text("Продолжить", exact=True).first.click(timeout=1000)
     except Exception:
         pass
 
+
 def _looks_logged_in(page: Page) -> bool:
-    """
-    True only when session is actually authorized.
-    Not logged in if:
-      - URL contains /profile/login
-      - login inputs are present
-    Positive signal: 'Мой профиль' or any /profile without /login.
-    """
+    """Heuristically checks if the page session is authenticated."""
     url = page.url.lower()
     if "profile/login" in url:
         return False
-    # login form visible => definitely not authorized
+    # Login form visible => definitely not authorized
     if page.locator("input[name='login']").count() or page.locator("input[type='password']").count():
         return False
-    # strong positive signal
+    # Strong positive signal
     if page.locator("text=Мой профиль").count():
         return True
-    # weak positive (profile url without /login)
-    return ("profile" in url) and ("login" not in url)
+    # Weak positive signal (profile URL without /login)
+    return "profile" in url and "login" not in url
 
-def _validate_state_once(browser: Browser, role: str, state_file: Path) -> None:
+
+def _validate_state_once(browser: Browser, profile: str, state_file: Path) -> None:
     """
-    Open a temporary context with the saved state and verify we're truly logged in.
-    If invalid, fail with a clear message telling how to create the state.
+    (Process-safe) Opens a temporary context to verify the session is active.
+    If invalid, deletes the bad state file and fails with a clear message.
     """
-    # Already validated in this pytest session
-    if _STATE_VALIDATED.get(role):
+    if _STATE_VALIDATED.get(profile):
         return
 
-    ctx = browser.new_context(storage_state=str(state_file))
-    page = ctx.new_page()
+    lock_file = state_file.with_suffix(".json.lock")
     try:
-        page.goto("https://www.avito.ru/profile", timeout=60_000)
-        _click_continue_if_present(page)
-
-        # short settle loop (~5s)
-        for _ in range(10):
-            if _looks_logged_in(page):
-                _STATE_VALIDATED[role] = True
+        with FileLock(str(lock_file), timeout=120):
+            # After acquiring lock, another process might have already validated.
+            if _STATE_VALIDATED.get(profile):
                 return
-            page.wait_for_timeout(500)
-            _click_continue_if_present(page)
 
-        # If we get here, the state is not valid
-        pytest.fail(
-            f"Cached session is invalid for role '{role}': {state_file}\n"
-            f"Create/refresh it manually:\n"
-            f"    python tools/bootstrap_auth.py\n"
-            f"(Browser will open → solve CAPTCHA + SMS → press ENTER to save state.)"
-        )
-    finally:
-        ctx.close()
+            ctx = browser.new_context(storage_state=str(state_file))
+            page = ctx.new_page()
+            try:
+                page.goto("https://www.avito.ru/profile", timeout=60_000)
+                _click_continue_if_present(page)
+
+                for _ in range(10):
+                    if _looks_logged_in(page):
+                        _STATE_VALIDATED[profile] = True
+                        return
+                    page.wait_for_timeout(500)
+                    _click_continue_if_present(page)
+
+                # State is invalid: delete the file before failing
+                try:
+                    state_file.unlink()
+                    print(f"\n[auth] Deleted invalid state file: {state_file}")
+                except OSError as e:
+                    print(f"\n[auth] Warning: Could not delete invalid state file: {e}")
+
+                pytest.fail(
+                    f"Cached session is invalid for profile '{profile}'. The bad file has been deleted.\n"
+                    f"Please create a new one by running:\n"
+                    f"    python tools/bootstrap_auth.py --profile {profile}"
+                )
+            finally:
+                ctx.close()
+    except Timeout:
+        pytest.fail(f"Could not acquire lock for state validation '{lock_file}' after 2 minutes.")
+
 
 # --- Fixtures ----------------------------------------------------------------
 @pytest.fixture(scope="session")
 def test_users() -> dict:
+    """Loads test user data from a JSON file."""
     if USERS_JSON.exists():
         with open(USERS_JSON, "r", encoding="utf-8") as f:
             return json.load(f)
     return {}
 
+
 @pytest.fixture
 def login_factory(browser: Browser, request: pytest.FixtureRequest):
     """
+    A factory fixture to get a logged-in Page object for a specific test profile.
+
     Usage:
-        page = login_factory("buyer")    # requires .auth/buyer.json
-        page = login_factory("seller")   # requires .auth/seller.json
+        page = login_factory("profile1")
+        page = login_factory("profile2")
 
     Behavior:
-      - If state file is missing -> fail with a clear instruction to run the bootstrap script.
-      - If present -> validate once per role (no login attempt).
-      - Always returns a Page with the cached state applied.
+      - Fails with a clear error if the required auth file is missing.
+      - (Process-safe) Validates the auth file once per profile per test run.
+      - Returns a new, clean Page object with the cached auth state applied.
     """
-    def _login(role: str = "buyer", *, reuse_state: bool = True) -> Page:
-        role = role.lower().strip()
-        state_file = _state_file_for(role)
+    def _login(profile: str = "profile1", *, reuse_state: bool = True) -> Page:
+        profile = profile.lower().strip()
+        state_file = _state_file_for(profile)
 
         if reuse_state:
             if not state_file.exists():
                 pytest.fail(
-                    f"Missing cached session for role '{role}': {state_file}\n"
+                    f"Missing cached session for profile '{profile}': {state_file}\n"
                     f"Create it manually:\n"
-                    f"    python tools/bootstrap_auth.py"
+                    f"    python tools/bootstrap_auth.py --profile {profile}"
                 )
-            # Validate once per role (no login attempt)
-            _validate_state_once(browser, role, state_file)
-            # Now open a fresh context for the test itself
+            _validate_state_once(browser, profile, state_file)
             ctx = browser.new_context(storage_state=str(state_file))
         else:
-            # Raw context (no auth)
             ctx = browser.new_context()
 
         page = ctx.new_page()
