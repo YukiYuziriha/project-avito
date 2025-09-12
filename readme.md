@@ -3,13 +3,12 @@
 A robust UI test automation framework in **Python** using **Playwright** and **Pytest** to validate key user workflows on **Avito.ru**, with CI via **GitHub Actions**.
 
 ## Objectives
+- Prove a **maintainable, professional** automation system.
+- Cover **core end-to-end** user journeys.
+- Run reliably in **CI on every PR**, producing clear, developer-friendly feedback.
+- Demonstrate senior-level choices: clean architecture and professional delivery.
 
-  - Prove a **maintainable, professional** automation system.
-  - Cover **core end-to-end** user journeys.
-  - Run reliably in **CI on every PR**, producing clear, developer-friendly feedback.
-  - Demonstrate senior-level choices: clean architecture and professional delivery.
-
------
+---
 
 ## Local Development Setup
 
@@ -31,48 +30,49 @@ This project requires a one-time manual authentication step to generate a local 
 
 ### **Step 2: Create `.env` File**
 
-Create a `.env` file in the project root by copying the `.env.example`. Fill it with your test account credentials. You can provide credentials for different roles (`buyer`, `seller`) or a generic fallback.
+Create a `.env` file in the project root by copying the `.env.example`. Fill it with your test account credentials using the scalable `PROFILEN` convention.
 
 ```ini
 # .env
-# Credentials for the 'buyer' role
-AVITO_BUYER_USERNAME="your_buyer_login"
-AVITO_BUYER_PASSWORD="your_buyer_password"
+# Credentials for different test profiles
+AVITO_PROFILE1_USERNAME="<login_for_profile1>"
+AVITO_PROFILE1_PASSWORD="<password_for_profile1>"
 
-# Credentials for the 'seller' role
-AVITO_SELLER_USERNAME="your_seller_login"
-AVITO_SELLER_PASSWORD="your_seller_password"
-```
+AVITO_PROFILE2_USERNAME="<login_for_profile2>"
+AVITO_PROFILE2_PASSWORD="<password_for_profile2>"
+````
 
 ### **Step 3: Generate Authentication State**
 
-Run the interactive bootstrap script to log in manually and save the session state. A browser window will open, and you must solve any CAPTCHAs and enter SMS codes.
+Run the interactive bootstrap script to log in manually and save the session state. A browser window will open for you to solve any CAPTCHAs and enter SMS codes.
 
-  * To log in as the **buyer**:
+  * **To log in as `profile1`**:
     ```bash
-    python tools/bootstrap_auth.py --role buyer
+    python tools/bootstrap_auth.py --profile profile1
     ```
-  * To log in as the **seller**:
+  * **To re-authenticate even if the session is still valid**:
     ```bash
-    python tools/bootstrap_auth.py --role seller
+    python tools/bootstrap_auth.py --profile profile1 --force
     ```
 
-After you are successfully logged in within the browser, press **Enter** in your terminal. This will save a `buyer.json` or `seller.json` file to the `.auth/` directory. These files are git-ignored.
+The script will first check if a valid session already exists. If so, it will do nothing. After you log in, it saves a `profilename.json` file to the `.auth/` directory.
 
 ### **Step 4: Run Tests**
 
-You can now run the Pytest suite. The tests will automatically use the cached authentication state.
+You can now run the Pytest suite. The tests will automatically use the cached authentication state, which is validated once per run.
 
-```bash
-# Run all tests
-pytest
-
-# Run tests in headed mode to watch the browser
-pytest --headed
-
-# Run a specific test file
-pytest tests/test_search_filters.py
-```
+  * **Run all tests**:
+    ```bash
+    pytest
+    ```
+  * **Run tests in parallel and in headed mode**:
+    ```bash
+    pytest -n auto --headed
+    ```
+  * **Run tests in a specific file**:
+    ```bash
+    pytest tests/test_search_filters.py
+    ```
 
 -----
 
@@ -81,9 +81,9 @@ pytest tests/test_search_filters.py
 ```
 .
 ├── .auth/                  # Stores cached authentication state (git-ignored)
-├── artifacts/              # Stores debug output like screenshots (git-ignored)
-├── pages/                  # Page Object Model files (e.g., home_page.py)
-├── tests/                  # Test files (e.g., test_search.py)
+├── artifacts/              # Stores debug output like screenshots and traces (git-ignored)
+├── pages/                  # Page Object Model files
+├── tests/                  # Test files
 ├── test_data/              # Test data files (e.g., test_users.json)
 ├── tools/                  # Helper and utility scripts
 │   ├── bootstrap_auth.py   # Interactive script to create auth state
@@ -93,3 +93,4 @@ pytest tests/test_search_filters.py
 ├── conftest.py             # Pytest fixtures and test configuration
 ├── pytest.ini              # Pytest configuration
 └── requirements.txt        # Project dependencies
+```
