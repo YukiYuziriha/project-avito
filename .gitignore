@@ -12,6 +12,7 @@ appsettings.json
 .idea/
 *.swp
 .DS_Store
+.continue
 
 # Runtime & Dependency files
 __pycache__/
@@ -29,3 +30,6 @@ htmlcov/
 .auth/
 test-results/
 playwright-report/
+
+# My private stuff 
+private_data/
