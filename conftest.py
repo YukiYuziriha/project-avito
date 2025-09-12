@@ -1,4 +1,5 @@
 # conftest.py
+import os
 import json
 from pathlib import Path
 import pytest
@@ -13,6 +14,7 @@ AUTH_DIR = ROOT / ".auth"
 AUTH_DIR.mkdir(exist_ok=True)
 DATA_DIR = ROOT / "test_data"
 USERS_JSON = DATA_DIR / "test_users.json"
+BASE_URL = os.getenv("AVITO_BASE_URL", "https://www.avito.ru")
 
 # Remember which profiles we've already validated this session
 _STATE_VALIDATED: dict[str, bool] = {}
@@ -27,7 +29,7 @@ def _state_file_for(profile: str) -> Path:
 def _click_continue_if_present(page: Page) -> None:
     """Clicks the 'Continue' button if it appears after navigation."""
     try:
-        page.get_by_text("Продолжить", exact=True).first.click(timeout=1000)
+        page.get_by_text("Продолжить", exact=False).first.click(timeout=1000)
     except Exception:
         pass
 
@@ -37,13 +39,10 @@ def _looks_logged_in(page: Page) -> bool:
     url = page.url.lower()
     if "profile/login" in url:
         return False
-    # Login form visible => definitely not authorized
     if page.locator("input[name='login']").count() or page.locator("input[type='password']").count():
         return False
-    # Strong positive signal
     if page.locator("text=Мой профиль").count():
         return True
-    # Weak positive signal (profile URL without /login)
     return "profile" in url and "login" not in url
 
 
@@ -58,14 +57,14 @@ def _validate_state_once(browser: Browser, profile: str, state_file: Path) -> No
     lock_file = state_file.with_suffix(".json.lock")
     try:
         with FileLock(str(lock_file), timeout=120):
-            # After acquiring lock, another process might have already validated.
             if _STATE_VALIDATED.get(profile):
                 return
 
             ctx = browser.new_context(storage_state=str(state_file))
             page = ctx.new_page()
+            page.set_default_timeout(20_000)
             try:
-                page.goto("https://www.avito.ru/profile", timeout=60_000)
+                page.goto(f"{BASE_URL}/profile", timeout=60_000)
                 _click_continue_if_present(page)
 
                 for _ in range(10):
@@ -106,16 +105,11 @@ def test_users() -> dict:
 @pytest.fixture
 def login_factory(browser: Browser, request: pytest.FixtureRequest):
     """
-    A factory fixture to get a logged-in Page object for a specific test profile.
+    Factory fixture to get a logged-in Page object for a specific test profile.
 
     Usage:
         page = login_factory("profile1")
         page = login_factory("profile2")
-
-    Behavior:
-      - Fails with a clear error if the required auth file is missing.
-      - (Process-safe) Validates the auth file once per profile per test run.
-      - Returns a new, clean Page object with the cached auth state applied.
     """
     def _login(profile: str = "profile1", *, reuse_state: bool = True) -> Page:
         profile = profile.lower().strip()

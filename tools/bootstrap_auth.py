@@ -13,9 +13,17 @@ load_dotenv(find_dotenv())
 
 AUTH_DIR = ROOT / ".auth"
 AUTH_DIR.mkdir(exist_ok=True)
-# Import the check function from the now-robust check_state.py
+
+ART_DIR = ROOT / "artifacts"
+ART_DIR.mkdir(exist_ok=True)
+
+BASE_URL = os.getenv("AVITO_BASE_URL", "https://www.avito.ru")
+HEADLESS = bool(int(os.getenv("AVITO_HEADLESS", "0")))
+
+# Import the check function
 sys.path.append(str(ROOT / "tools"))
 from check_state import check as check_state_validity
+
 
 # --- Helpers -----------------------------------------------------------------
 def get_last_profile(default="profile1") -> str:
@@ -27,36 +35,61 @@ def get_last_profile(default="profile1") -> str:
             return profile
     return default
 
+
 def resolve_creds(profile: str):
     """Resolves credentials for a given profile from environment variables."""
     profile_up = profile.upper()
     user = os.getenv(f"AVITO_{profile_up}_USERNAME") or os.getenv("AVITO_USERNAME")
     pwd = os.getenv(f"AVITO_{profile_up}_PASSWORD") or os.getenv("AVITO_PASSWORD")
-    assert user and pwd, (
-        f"Missing credentials in .env for profile '{profile}'.\n"
-        f"Provide AVITO_{profile_up}_USERNAME/PASSWORD or generic AVITO_USERNAME/PASSWORD."
-    )
+    if not (user and pwd):
+        raise RuntimeError(
+            f"Missing credentials for profile '{profile}'. "
+            f"Set AVITO_{profile_up}_USERNAME/PASSWORD or AVITO_USERNAME/AVITO_PASSWORD in .env"
+        )
     return user, pwd
+
 
 def is_logged_in(page: Page) -> bool:
     """Heuristically checks if the page session is authenticated."""
     url = page.url.lower()
-    if "profile/login" in url: return False
-    if page.locator("input[name='login']").count() or page.locator("input[type='password']").count(): return False
-    if page.locator("text=Мой профиль").count(): return True
+    if "profile/login" in url:
+        return False
+    if page.locator("input[name='login']").count() or page.locator("input[type='password']").count():
+        return False
+    if page.locator("text=Мой профиль").count():
+        return True
     return "profile" in url and "login" not in url
+
+
+def save_artifacts(page: Page, profile: str, reason: str):
+    """Save screenshot + HTML for debugging bootstrap failures."""
+    ts = int(time.time())
+    base = f"bootstrap_{profile}_{reason}_{ts}"
+    try:
+        png = ART_DIR / f"{base}.png"
+        html = ART_DIR / f"{base}.html"
+        page.screenshot(path=str(png), full_page=True)
+        html.write_text(page.content(), encoding="utf-8")
+        print(f"[bootstrap] Saved artifacts: {png.name}, {html.name}")
+    except Exception as e:
+        print(f"[bootstrap] Could not save artifacts: {e}")
+
 
 # --- Main Logic --------------------------------------------------------------
 def run_login_flow(p: Playwright, profile: str, state_file: Path):
     """Handles the browser interaction for logging in and saving state."""
     user, pwd = resolve_creds(profile)
-    browser = p.chromium.launch(headless=False, args=["--disable-blink-features=AutomationControlled"])
+    browser = p.chromium.launch(
+        headless=HEADLESS,
+        args=["--disable-blink-features=AutomationControlled"]
+    )
     ctx = browser.new_context()
     page = ctx.new_page()
+    page.set_default_timeout(20_000)
 
     try:
         print(f"\n[bootstrap] Attempting to log in as profile: '{profile}'...")
-        page.goto("https://www.avito.ru/profile/login", timeout=60_000)
+        page.goto(f"{BASE_URL}/profile/login", timeout=60_000)
         page.fill('input[name="login"]', user, timeout=10_000)
         page.fill('input[name="password"]', pwd, timeout=10_000)
         page.click('button[type="submit"]', timeout=10_000)
@@ -64,24 +97,30 @@ def run_login_flow(p: Playwright, profile: str, state_file: Path):
         if sys.stdin.isatty():
             # Interactive mode for local development
             print(f"\n[bootstrap:{profile}] A browser window has opened.")
-            print(">>> Please solve CAPTCHA, enter SMS code, and complete login.")
-            print(">>> When your profile page is fully visible, press ENTER here to save the session.")
+            print(">>> Solve CAPTCHA / enter SMS code and finish login.")
+            print(">>> When profile page is fully visible, press ENTER here to save the session.")
             while True:
                 input("\n[bootstrap] Press ENTER to verify login and save... ")
-                if is_logged_in(page): break
-                print("[bootstrap] Still not logged in. Please finish logging in, then press ENTER again.")
+                try:
+                    page.wait_for_load_state('networkidle', timeout=5_000)
+                except Exception:
+                    pass
+                if is_logged_in(page):
+                    break
+                print("[bootstrap] Still not logged in. Finish login then press ENTER again.")
         else:
             # Non-interactive mode for CI/CD
             print("\n[bootstrap] No TTY detected. Auto-waiting up to 10 minutes for login...")
             try:
                 page.wait_for_url("**/profile/**", timeout=600_000)
-                # Add a small wait for the page to be idle after redirect
                 page.wait_for_load_state('networkidle', timeout=15_000)
             except PWTimeout:
+                save_artifacts(page, profile, "timeout")
                 raise TimeoutError("Login was not detected within the 10-minute window.")
 
         # Final verification before saving
         if not is_logged_in(page):
+            save_artifacts(page, profile, "invalid")
             raise RuntimeError("Login check failed. Refusing to save an invalid state.")
 
         ctx.storage_state(path=str(state_file))
@@ -89,6 +128,7 @@ def run_login_flow(p: Playwright, profile: str, state_file: Path):
 
     finally:
         browser.close()
+
 
 def main(profile_arg: str | None, force: bool):
     """Main entrypoint for the bootstrap script."""
@@ -112,6 +152,7 @@ def main(profile_arg: str | None, force: bool):
 
     with sync_playwright() as p:
         run_login_flow(p, profile, state_file)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Bootstrap Avito auth state for a test profile.")

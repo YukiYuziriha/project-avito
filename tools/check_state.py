@@ -4,7 +4,7 @@ import argparse
 import os
 import time
 from dotenv import load_dotenv, find_dotenv
-from playwright.sync_api import sync_playwright, Page, Playwright, Browser
+from playwright.sync_api import sync_playwright, Page, Playwright
 from filelock import FileLock, Timeout
 
 # --- Setup -------------------------------------------------------------------
@@ -17,28 +17,26 @@ ART_DIR.mkdir(exist_ok=True)
 TRACE_DIR = ART_DIR / "traces"
 TRACE_DIR.mkdir(exist_ok=True)
 
+BASE_URL = os.getenv("AVITO_BASE_URL", "https://www.avito.ru")
+ENV_FORCE_HEADLESS = bool(int(os.getenv("AVITO_HEADLESS", "0")))
+
 
 # --- Helpers -----------------------------------------------------------------
 def is_logged_in(page: Page) -> bool:
-    """Heuristically checks if the page session is authenticated."""
     url = page.url.lower()
     if "profile/login" in url:
         return False
-    # Login form visible => definitely not authorized
     if page.locator("input[name='login']").count() or page.locator("input[type='password']").count():
         return False
-    # Strong positive signal
     if page.locator("text=Мой профиль").count():
         return True
     return "profile" in url and "login" not in url
 
 
 def save_artifacts(page: Page, profile: str, reason: str):
-    """Saves screenshot, HTML, and trace file for debugging."""
     ts = int(time.time())
     base_name = f"state_check_{profile}_{reason}_{ts}"
     try:
-        # Save Screenshot and HTML
         png_path = ART_DIR / f"{base_name}.png"
         page.screenshot(path=str(png_path), full_page=True)
         html_path = ART_DIR / f"{base_name}.html"
@@ -61,7 +59,6 @@ def check(profile: str, headed: bool) -> int:
 
     lock_file = state_file.with_suffix(".json.lock")
     try:
-        # Use a file lock to prevent multiple CI jobs checking at the same time
         with FileLock(str(lock_file), timeout=60):
             with sync_playwright() as p:
                 return run_check_with_browser(p, profile, state_file, headed)
@@ -72,29 +69,28 @@ def check(profile: str, headed: bool) -> int:
         print(f"[state] ❌ An unexpected error occurred: {e}")
         return 3
 
+
 def run_check_with_browser(p: Playwright, profile: str, state_file: Path, headed: bool) -> int:
     """The core logic for browser interaction and validation."""
-    browser = p.chromium.launch(headless=not headed)
+    # If env forces headless, obey it even if headed=True was passed.
+    headless_launch = ENV_FORCE_HEADLESS or (not headed)
+
+    browser = p.chromium.launch(headless=headless_launch)
     context = browser.new_context(storage_state=str(state_file))
-    # Start tracing for better debugging artifacts
     trace_path = TRACE_DIR / f"trace_{profile}_{int(time.time())}.zip"
     context.tracing.start(screenshots=True, snapshots=True, sources=True)
     page = context.new_page()
-    try:
-        # Master timeout for the entire check
-        page.set_default_timeout(20_000) # 20 seconds
-        
-        page.goto("https://www.avito.ru/profile")
+    page.set_default_timeout(20_000)
 
-        # Wait for the page to settle, up to 10 seconds
+    try:
+        page.goto(f"{BASE_URL}/profile")
         page.wait_for_load_state('networkidle', timeout=10_000)
 
         if is_logged_in(page):
             print(f"[state] ✅ Valid state for profile '{profile}': {state_file}")
-            context.tracing.stop() # No need to save trace on success
+            context.tracing.stop()  # No need to save trace on success
             return 0
         else:
-            # If invalid, save all artifacts before returning
             context.tracing.stop(path=str(trace_path))
             print(f"[state] ❌ Invalid state. Saved Playwright Trace: {trace_path.name}")
             save_artifacts(page, profile, "invalid")
