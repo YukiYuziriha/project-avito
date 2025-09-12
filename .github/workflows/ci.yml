@@ -1,32 +1,13 @@
-name: CI
-on:
-  pull_request:
-    branches: [ main ]
+name: tests
+on: [push, pull_request]
+
 jobs:
-  test:
+  ui:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: '3.11' }
-      - name: Cache pip
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: pip-${{ hashFiles('**/requirements.txt') }}
       - run: pip install -r requirements.txt
-      - run: playwright install --with-deps
-      - name: Run tests
-        run: pytest -q --junitxml=pytest-report.xml
-      - name: Upload artifacts on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-artifacts
-          path: |
-            **/screenshots/**
-            **/trace.zip
-            pytest-report.xml
-          retention-days: 7
+      - run: python -m playwright install --with-deps
+      - run: pytest -q
