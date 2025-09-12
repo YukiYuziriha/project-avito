@@ -4,10 +4,36 @@ on: [push, pull_request]
 jobs:
   ui:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with: { python-version: '3.11' }
-      - run: pip install -r requirements.txt
-      - run: python -m playwright install --with-deps
-      - run: pytest -q
+
+      # Cache pip packages (speeds up installs)
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: ${{ runner.os }}-pip-
+
+      - name: Install Python deps
+        run: pip install -r requirements.txt
+
+      # Cache Playwright browsers so we don't download them every run
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-ms-playwright-1.48.0
+          restore-keys: ${{ runner.os }}-ms-playwright-
+
+      # Install **only Chromium** (much faster & enough for now)
+      - name: Install Playwright (Chromium)
+        run: python -m playwright install chromium
+
+      - name: Run tests
+        run: pytest -q
