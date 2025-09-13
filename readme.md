@@ -8,6 +8,18 @@ A robust UI test automation framework in **Python** using **Playwright** and **P
 - Run reliably in **CI on every PR**, producing clear, developer-friendly feedback.
 - Demonstrate senior-level choices: clean architecture and professional delivery.
 
+## Project Plan
+- **Tooling:** Python, Playwright and Pytest with a Page Object Model architecture.
+- **Scenarios:** Buyer search & filter, seller post ad, buyer favourite & message seller.
+- **Data:** Small JSON datasets and fixtures for deterministic test users.
+- **CI:** GitHub Actions pipeline running tests on every pull request.
+
+## Current Status
+- Core page objects and fixtures are implemented in `pages/` and `conftest.py`.
+- Tests for the three core journeys live under `tests/` and run locally with a cached auth state.
+- GitHub Actions workflow (`.github/workflows/tests.yml`) executes non-auth tests on PRs.
+- Authentication bootstrap script (`tools/bootstrap_auth.py`) prepares session state for full E2E runs.
+
 ---
 
 ## Local Development Setup
@@ -27,7 +39,6 @@ This project requires a one-time manual authentication step to generate a local 
     pip install -r requirements.txt
     playwright install --with-deps
     ```
-
 ### **Step 2: Create `.env` File**
 
 Create a `.env` file in the project root by copying the `.env.example`. Fill it with your test account credentials using the scalable `PROFILEN` convention.

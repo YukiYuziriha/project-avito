@@ -24,6 +24,10 @@ HEADLESS = bool(int(os.getenv("AVITO_HEADLESS", "0")))
 sys.path.append(str(ROOT / "tools"))
 from check_state import check as check_state_validity
 
+# Import LoginPage POM
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+from pages.login_page import LoginPage
 
 # --- Helpers -----------------------------------------------------------------
 def get_last_profile(default="profile1") -> str:
@@ -34,7 +38,6 @@ def get_last_profile(default="profile1") -> str:
         if profile:
             return profile
     return default
-
 
 def resolve_creds(profile: str):
     """Resolves credentials for a given profile from environment variables."""
@@ -48,7 +51,6 @@ def resolve_creds(profile: str):
         )
     return user, pwd
 
-
 def is_logged_in(page: Page) -> bool:
     """Heuristically checks if the page session is authenticated."""
     url = page.url.lower()
@@ -59,7 +61,6 @@ def is_logged_in(page: Page) -> bool:
     if page.locator("text=Мой профиль").count():
         return True
     return "profile" in url and "login" not in url
-
 
 def save_artifacts(page: Page, profile: str, reason: str):
     """Save screenshot + HTML for debugging bootstrap failures."""
@@ -73,7 +74,6 @@ def save_artifacts(page: Page, profile: str, reason: str):
         print(f"[bootstrap] Saved artifacts: {png.name}, {html.name}")
     except Exception as e:
         print(f"[bootstrap] Could not save artifacts: {e}")
-
 
 # --- Main Logic --------------------------------------------------------------
 def run_login_flow(p: Playwright, profile: str, state_file: Path):
@@ -89,27 +89,43 @@ def run_login_flow(p: Playwright, profile: str, state_file: Path):
 
     try:
         print(f"\n[bootstrap] Attempting to log in as profile: '{profile}'...")
-        page.goto(f"{BASE_URL}/profile/login", timeout=60_000)
-        page.fill('input[name="login"]', user, timeout=10_000)
-        page.fill('input[name="password"]', pwd, timeout=10_000)
-        page.click('button[type="submit"]', timeout=10_000)
+
+        # --- USE THE POM HERE ---
+        lp = LoginPage(page)
+        lp.navigate()
+        lp.login(user, pwd)
+        # ------------------------
 
         if sys.stdin.isatty():
             # Interactive mode for local development
             print(f"\n[bootstrap:{profile}] A browser window has opened.")
             print(">>> Solve CAPTCHA / enter SMS code and finish login.")
             print(">>> When profile page is fully visible, press ENTER here to save the session.")
+            print(">>> NOTE: You might need to press ENTER more than once if you are not yet on your profile page.\n")
             while True:
-                input("\n[bootstrap] Press ENTER to verify login and save... ")
+                input("[bootstrap] Press ENTER to verify login and save (may not work until your profile page is visible)... ")
                 try:
                     page.wait_for_load_state('networkidle', timeout=5_000)
+                    # Always navigate to /profile to check state after pressing ENTER
+                    page.goto(f"{BASE_URL}/profile", timeout=30_000)
+                    page.wait_for_load_state('networkidle', timeout=10_000)
                 except Exception:
                     pass
-                if is_logged_in(page):
-                    break
-                print("[bootstrap] Still not logged in. Finish login then press ENTER again.")
+                try:
+                    if is_logged_in(page):
+                        break
+                except Exception:
+                    # Retry ONCE in case of context lost during navigation
+                    time.sleep(1)
+                    try:
+                        if is_logged_in(page):
+                            break
+                    except Exception:
+                        print("[bootstrap] Playwright navigation in progress. Please press ENTER again if your profile page is visible.")
+                        continue
+                print("[bootstrap] Still not logged in. Finish login (or navigate to your profile), then press ENTER again.")
         else:
-            # Non-interactive mode for CI/CD
+            # Non-interactive mode for CI/CD (shouldn't be needed for manual use)
             print("\n[bootstrap] No TTY detected. Auto-waiting up to 10 minutes for login...")
             try:
                 page.wait_for_url("**/profile/**", timeout=600_000)
@@ -128,7 +144,6 @@ def run_login_flow(p: Playwright, profile: str, state_file: Path):
 
     finally:
         browser.close()
-
 
 def main(profile_arg: str | None, force: bool):
     """Main entrypoint for the bootstrap script."""
@@ -152,7 +167,6 @@ def main(profile_arg: str | None, force: bool):
 
     with sync_playwright() as p:
         run_login_flow(p, profile, state_file)
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Bootstrap Avito auth state for a test profile.")
