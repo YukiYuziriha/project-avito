@@ -90,18 +90,33 @@ You can now run the Pytest suite. The tests will automatically use the cached au
 ## Project Structure
 
 ```
+profile
+Qwen3-Max
+5:07 pm
+✅ Updated README Section: Project Structure
+Replace the existing Project Structure section in your README.md with this updated version:
+
+markdown
+
+
+1
+2
+## Project Structure
+
 .
-├── .auth/                  # Stores cached authentication state (git-ignored)
-├── artifacts/              # Stores debug output like screenshots and traces (git-ignored)
-├── pages/                  # Page Object Model files
-├── tests/                  # Test files
-├── test_data/              # Test data files (e.g., test_users.json)
-├── tools/                  # Helper and utility scripts
-│   ├── bootstrap_auth.py   # Interactive script to create auth state
-│   └── check_state.py      # Utility to validate an existing auth state
-├── .env                    # Local environment variables (git-ignored)
-├── .env.example            # Template for environment variables
-├── conftest.py             # Pytest fixtures and test configuration
-├── pytest.ini              # Pytest configuration
-└── requirements.txt        # Project dependencies
+├── .auth/ # Stores cached authentication state (git-ignored)
+├── artifacts/ # Stores debug output like screenshots and traces (git-ignored)
+├── pages/ # Page Object Model files
+├── tests/
+│ ├── smoke/ # Smoke tests (e.g., auth integration)
+│ └── <feature>/ # Feature-specific UI tests (e.g., search, messaging)
+├── test_data/ # Test data files (e.g., test_users.json)
+├── tools/ # Helper and utility scripts
+│ ├── bootstrap_auth.py # Interactive script to create auth state
+│ └── check_state.py # Utility to validate an existing auth state
+├── .env # Local environment variables (git-ignored)
+├── .env.example # Template for environment variables
+├── conftest.py # Pytest fixtures and test configuration
+├── pytest.ini # Pytest configuration
+└── requirements.txt # Project dependencies
 ```
