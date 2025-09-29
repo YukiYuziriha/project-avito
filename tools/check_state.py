@@ -34,14 +34,12 @@ def is_logged_in(page: Page) -> bool:
     if page.locator("input[name='login']").count() or page.locator("input[type='password']").count():
         return False
 
-    # Positive signals: any of these visible = logged in
+    # Positive signals: use stable data-marker attributes (not text!)
     profile_indicators = [
-        '[data-marker="profile/header"]',
-        'text="Мой профиль"',
-        'text="Мои объявления"',
-        'text="Избранное"',
-        'text="Сообщения"',
-    ]
+    '[data-marker="header/username-button"]',
+    '[data-marker="header/tooltip-list"]',
+    'a[href="/profile"]:has-text("Мои объявления")',
+]
     for selector in profile_indicators:
         try:
             if page.locator(selector).is_visible():
@@ -51,7 +49,6 @@ def is_logged_in(page: Page) -> bool:
 
     # Fallback: URL contains /profile/ but not /login
     return "/profile/" in url and "/profile/login" not in url
-
 
 def save_artifacts(page: Page, profile: str, reason: str):
     ts = int(time.time())
