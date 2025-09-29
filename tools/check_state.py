@@ -17,20 +17,40 @@ ART_DIR.mkdir(exist_ok=True)
 TRACE_DIR = ART_DIR / "traces"
 TRACE_DIR.mkdir(exist_ok=True)
 
-BASE_URL = os.getenv("AVITO_BASE_URL", "https://www.avito.ru")
+BASE_URL = os.getenv("AVITO_BASE_URL", "https://www.avito.ru").strip()
 ENV_FORCE_HEADLESS = bool(int(os.getenv("AVITO_HEADLESS", "0")))
 
 
 # --- Helpers -----------------------------------------------------------------
 def is_logged_in(page: Page) -> bool:
+    """
+    Robust, user-centric heuristic for Avito logged-in state.
+    Returns True if any known profile section is visible.
+    """
     url = page.url.lower()
+    # Explicit logout/login indicators
     if "profile/login" in url:
         return False
     if page.locator("input[name='login']").count() or page.locator("input[type='password']").count():
         return False
-    if page.locator("text=Мой профиль").count():
-        return True
-    return "profile" in url and "login" not in url
+
+    # Positive signals: any of these visible = logged in
+    profile_indicators = [
+        '[data-marker="profile/header"]',
+        'text="Мой профиль"',
+        'text="Мои объявления"',
+        'text="Избранное"',
+        'text="Сообщения"',
+    ]
+    for selector in profile_indicators:
+        try:
+            if page.locator(selector).is_visible():
+                return True
+        except Exception:
+            continue
+
+    # Fallback: URL contains /profile/ but not /login
+    return "/profile/" in url and "/profile/login" not in url
 
 
 def save_artifacts(page: Page, profile: str, reason: str):
@@ -84,7 +104,11 @@ def run_check_with_browser(p: Playwright, profile: str, state_file: Path, headed
 
     try:
         page.goto(f"{BASE_URL}/profile")
-        page.wait_for_load_state('networkidle', timeout=10_000)
+        # Increased timeout to handle Avito's slow redirects
+        page.wait_for_load_state('networkidle', timeout=15_000)
+
+        # Debug: log final URL
+        print(f"[state] Final URL after navigation: {page.url}")
 
         if is_logged_in(page):
             print(f"[state] ✅ Valid state for profile '{profile}': {state_file}")
