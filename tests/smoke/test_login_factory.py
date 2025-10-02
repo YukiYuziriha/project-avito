@@ -1,10 +1,9 @@
 # tests/smoke/test_login_factory.py
 import os
-from playwright.sync_api import expect
 
 def test_login_factory_smoke(login_factory):
     page = login_factory("profile1")
-    base_url = os.getenv("AVITO_BASE_URL", "https://www.avito.ru").rstrip()
+    base_url = os.getenv("AVITO_BASE_URL", "https://www.avito.ru")
     page.goto(f"{base_url}/profile")
 
     assert "profile" in page.url.lower()
