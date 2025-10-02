@@ -1,4 +1,4 @@
-```markdown
+
 # Avito UI Automation Framework
 
 A robust, professional-grade UI test automation framework in **Python** using **Playwright** and **Pytest** to validate core user workflows on **Avito.ru**, with CI via **GitHub Actions**.
@@ -45,7 +45,7 @@ source .venv/bin/activate  # Linux/macOS
 # Install deps
 pip install -r requirements.txt
 playwright install --with-deps
-```
+
 
 ### Step 2: Configure `.env`
 
