@@ -53,7 +53,3 @@ class LoginPage:
         if self._error.is_visible():
             return self._error.inner_text()
         return None
-
-    
-
-

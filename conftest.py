@@ -39,7 +39,10 @@ def _looks_logged_in(page: Page) -> bool:
     url = page.url.lower()
     if "profile/login" in url:
         return False
-    if page.locator("input[name='login']").count() or page.locator("input[type='password']").count():
+    if (
+        page.locator("input[name='login']").count()
+        or page.locator("input[type='password']").count()
+    ):
         return False
     if page.locator("text=Мой профиль").count():
         return True
@@ -89,7 +92,9 @@ def _validate_state_once(browser: Browser, profile: str, state_file: Path) -> No
             finally:
                 ctx.close()
     except Timeout:
-        pytest.fail(f"Could not acquire lock for state validation '{lock_file}' after 2 minutes.")
+        pytest.fail(
+            f"Could not acquire lock for state validation '{lock_file}' after 2 minutes."
+        )
 
 
 # --- Fixtures ----------------------------------------------------------------
@@ -111,6 +116,7 @@ def login_factory(browser: Browser, request: pytest.FixtureRequest):
         page = login_factory("profile1")
         page = login_factory("profile2")
     """
+
     def _login(profile: str = "profile1", *, reuse_state: bool = True) -> Page:
         profile = profile.lower().strip()
         state_file = _state_file_for(profile)

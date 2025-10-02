@@ -11,7 +11,9 @@ class AdDetailPage:
     def __init__(self, page: Page) -> None:
         self.page = page
         # Scoped to main content area to avoid duplicates in sticky footer / related ads
-        self._title_locator: Locator = page.locator('[data-marker="item-view/title-info"]')
+        self._title_locator: Locator = page.locator(
+            '[data-marker="item-view/title-info"]'
+        )
         self._price_locator: Locator = page.locator(
             '.js-item-view-title-info [data-marker="item-view/item-price"]'
         )
