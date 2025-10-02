@@ -1,13 +1,17 @@
 # Core test automation stack
-playwright==1.48.0         # Browser automation for Chromium, Firefox, WebKit
-pytest==8.3.3              # Test runner
-pytest-playwright==0.5.0   # Pytest plugin for Playwright integration
+playwright==1.48.0
+pytest==8.3.3
+pytest-playwright==0.5.0
 
 # Process-safe locking for state validation
 filelock==3.15.4
 
+# Static analysis (required for CI per GitHub Playbook)
+ruff==0.8.0
+mypy==1.11.2
+
 # Optional but recommended utilities
-pytest-html==4.1.1         # Generates HTML test reports
-pytest-xdist==3.6.1        # Parallel test execution
-faker==30.3.0              # Fake data generation for test inputs
-python-dotenv==1.0.1       # Load environment variables from .env files
+pytest-html==4.1.1
+pytest-xdist==3.6.1
+faker==30.3.0
+python-dotenv==1.0.1
