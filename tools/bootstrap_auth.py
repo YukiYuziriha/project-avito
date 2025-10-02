@@ -1,14 +1,23 @@
 # tools/bootstrap_auth.py
-from pathlib import Path
+# ruff: noqa: E402
 import os
 import sys
 import time
 import argparse
+from pathlib import Path
+
+# --- Early path setup (required for local imports) ---
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+sys.path.append(str(ROOT / "tools"))
+
+# --- Imports (ALL at top, no code between) ---
 from dotenv import load_dotenv, find_dotenv
 from playwright.sync_api import sync_playwright, Page, Playwright, TimeoutError as PWTimeout
+from check_state import check as check_state_validity
+from pages.login_page import LoginPage
 
 # --- Setup -------------------------------------------------------------------
-ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(find_dotenv())
 
 AUTH_DIR = ROOT / ".auth"
@@ -17,17 +26,9 @@ AUTH_DIR.mkdir(exist_ok=True)
 ART_DIR = ROOT / "artifacts"
 ART_DIR.mkdir(exist_ok=True)
 
-BASE_URL = os.getenv("AVITO_BASE_URL", "https://www.avito.ru")
+BASE_URL = os.getenv("AVITO_BASE_URL", "https://www.avito.ru  ")
 HEADLESS = bool(int(os.getenv("AVITO_HEADLESS", "0")))
 
-# Import the check function
-sys.path.append(str(ROOT / "tools"))
-from check_state import check as check_state_validity
-
-# Import LoginPage POM
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
-from pages.login_page import LoginPage
 
 # --- Helpers -----------------------------------------------------------------
 def get_last_profile(default="profile1") -> str:
@@ -38,6 +39,7 @@ def get_last_profile(default="profile1") -> str:
         if profile:
             return profile
     return default
+
 
 def resolve_creds(profile: str):
     """Resolves credentials for a given profile from environment variables."""
@@ -51,6 +53,7 @@ def resolve_creds(profile: str):
         )
     return user, pwd
 
+
 def is_logged_in(page: Page) -> bool:
     """Heuristically checks if the page session is authenticated."""
     url = page.url.lower()
@@ -61,6 +64,7 @@ def is_logged_in(page: Page) -> bool:
     if page.locator("text=Мой профиль").count():
         return True
     return "profile" in url and "login" not in url
+
 
 def save_artifacts(page: Page, profile: str, reason: str):
     """Save screenshot + HTML for debugging bootstrap failures."""
@@ -74,6 +78,7 @@ def save_artifacts(page: Page, profile: str, reason: str):
         print(f"[bootstrap] Saved artifacts: {png.name}, {html.name}")
     except Exception as e:
         print(f"[bootstrap] Could not save artifacts: {e}")
+
 
 # --- Main Logic --------------------------------------------------------------
 def run_login_flow(p: Playwright, profile: str, state_file: Path):
@@ -145,6 +150,7 @@ def run_login_flow(p: Playwright, profile: str, state_file: Path):
     finally:
         browser.close()
 
+
 def main(profile_arg: str | None, force: bool):
     """Main entrypoint for the bootstrap script."""
     profile = (profile_arg or get_last_profile()).lower().strip()
@@ -156,8 +162,8 @@ def main(profile_arg: str | None, force: bool):
         print(f"[bootstrap] Found existing state for '{profile}'. Verifying...")
         is_valid = check_state_validity(profile, headed=False) == 0
         if is_valid:
-            print(f"[bootstrap] ✅ Existing state is valid. Nothing to do.")
-            print(f"[bootstrap] (Use --force to re-authenticate anyway)")
+            print("[bootstrap] ✅ Existing state is valid. Nothing to do.")
+            print("[bootstrap] (Use --force to re-authenticate anyway)")
             return
 
     # Cleanup: Delete any old, potentially invalid state file before creating a new one.
@@ -167,6 +173,7 @@ def main(profile_arg: str | None, force: bool):
 
     with sync_playwright() as p:
         run_login_flow(p, profile, state_file)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Bootstrap Avito auth state for a test profile.")
