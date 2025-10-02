@@ -10,8 +10,8 @@ def test_home_page_search_smoke(login_factory):
     """
     page = login_factory("profile1")
     home = HomePage(page)
-    
+
     home.navigate().search("iphone").wait_for_results()
-    
+
     titles = home.get_visible_ad_titles()
     assert len(titles) > 0, "Expected at least one ad to appear after search"

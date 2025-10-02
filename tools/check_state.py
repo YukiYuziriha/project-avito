@@ -31,15 +31,18 @@ def is_logged_in(page: Page) -> bool:
     # Explicit logout/login indicators
     if "profile/login" in url:
         return False
-    if page.locator("input[name='login']").count() or page.locator("input[type='password']").count():
+    if (
+        page.locator("input[name='login']").count()
+        or page.locator("input[type='password']").count()
+    ):
         return False
 
     # Positive signals: use stable data-marker attributes (not text!)
     profile_indicators = [
-    '[data-marker="header/username-button"]',
-    '[data-marker="header/tooltip-list"]',
-    'a[href="/profile"]:has-text("Мои объявления")',
-]
+        '[data-marker="header/username-button"]',
+        '[data-marker="header/tooltip-list"]',
+        'a[href="/profile"]:has-text("Мои объявления")',
+    ]
     for selector in profile_indicators:
         try:
             if page.locator(selector).is_visible():
@@ -49,6 +52,7 @@ def is_logged_in(page: Page) -> bool:
 
     # Fallback: URL contains /profile/ but not /login
     return "/profile/" in url and "/profile/login" not in url
+
 
 def save_artifacts(page: Page, profile: str, reason: str):
     ts = int(time.time())
@@ -80,14 +84,18 @@ def check(profile: str, headed: bool) -> int:
             with sync_playwright() as p:
                 return run_check_with_browser(p, profile, state_file, headed)
     except Timeout:
-        print(f"[state] ❌ Timeout: Could not acquire lock '{lock_file.name}' within 60s.")
+        print(
+            f"[state] ❌ Timeout: Could not acquire lock '{lock_file.name}' within 60s."
+        )
         return 3
     except Exception as e:
         print(f"[state] ❌ An unexpected error occurred: {e}")
         return 3
 
 
-def run_check_with_browser(p: Playwright, profile: str, state_file: Path, headed: bool) -> int:
+def run_check_with_browser(
+    p: Playwright, profile: str, state_file: Path, headed: bool
+) -> int:
     """The core logic for browser interaction and validation."""
     # If env forces headless, obey it even if headed=True was passed.
     headless_launch = ENV_FORCE_HEADLESS or (not headed)
@@ -102,7 +110,7 @@ def run_check_with_browser(p: Playwright, profile: str, state_file: Path, headed
     try:
         page.goto(f"{BASE_URL}/profile")
         # Increased timeout to handle Avito's slow redirects
-        page.wait_for_load_state('networkidle', timeout=15_000)
+        page.wait_for_load_state("networkidle", timeout=15_000)
 
         # Debug: log final URL
         print(f"[state] Final URL after navigation: {page.url}")
@@ -113,7 +121,9 @@ def run_check_with_browser(p: Playwright, profile: str, state_file: Path, headed
             return 0
         else:
             context.tracing.stop(path=str(trace_path))
-            print(f"[state] ❌ Invalid state. Saved Playwright Trace: {trace_path.name}")
+            print(
+                f"[state] ❌ Invalid state. Saved Playwright Trace: {trace_path.name}"
+            )
             save_artifacts(page, profile, "invalid")
             return 1
 
@@ -131,14 +141,12 @@ def run_check_with_browser(p: Playwright, profile: str, state_file: Path, headed
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Validate a saved Avito auth state.")
     parser.add_argument(
-        "--profile",
-        default="profile1",
-        help="The profile to check (e.g., 'profile1')."
+        "--profile", default="profile1", help="The profile to check (e.g., 'profile1')."
     )
     parser.add_argument(
         "--headed",
         action="store_true",
-        help="Run the browser in headed mode to observe."
+        help="Run the browser in headed mode to observe.",
     )
     args = parser.parse_args()
     raise SystemExit(check(args.profile.lower().strip(), args.headed))

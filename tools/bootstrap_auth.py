@@ -13,7 +13,12 @@ sys.path.append(str(ROOT / "tools"))
 
 # --- Imports (ALL at top, no code between) ---
 from dotenv import load_dotenv, find_dotenv
-from playwright.sync_api import sync_playwright, Page, Playwright, TimeoutError as PWTimeout
+from playwright.sync_api import (
+    sync_playwright,
+    Page,
+    Playwright,
+    TimeoutError as PWTimeout,
+)
 from check_state import check as check_state_validity
 from pages.login_page import LoginPage
 
@@ -59,7 +64,10 @@ def is_logged_in(page: Page) -> bool:
     url = page.url.lower()
     if "profile/login" in url:
         return False
-    if page.locator("input[name='login']").count() or page.locator("input[type='password']").count():
+    if (
+        page.locator("input[name='login']").count()
+        or page.locator("input[type='password']").count()
+    ):
         return False
     if page.locator("text=Мой профиль").count():
         return True
@@ -85,8 +93,7 @@ def run_login_flow(p: Playwright, profile: str, state_file: Path):
     """Handles the browser interaction for logging in and saving state."""
     user, pwd = resolve_creds(profile)
     browser = p.chromium.launch(
-        headless=HEADLESS,
-        args=["--disable-blink-features=AutomationControlled"]
+        headless=HEADLESS, args=["--disable-blink-features=AutomationControlled"]
     )
     ctx = browser.new_context()
     page = ctx.new_page()
@@ -105,15 +112,21 @@ def run_login_flow(p: Playwright, profile: str, state_file: Path):
             # Interactive mode for local development
             print(f"\n[bootstrap:{profile}] A browser window has opened.")
             print(">>> Solve CAPTCHA / enter SMS code and finish login.")
-            print(">>> When profile page is fully visible, press ENTER here to save the session.")
-            print(">>> NOTE: You might need to press ENTER more than once if you are not yet on your profile page.\n")
+            print(
+                ">>> When profile page is fully visible, press ENTER here to save the session."
+            )
+            print(
+                ">>> NOTE: You might need to press ENTER more than once if you are not yet on your profile page.\n"
+            )
             while True:
-                input("[bootstrap] Press ENTER to verify login and save (may not work until your profile page is visible)... ")
+                input(
+                    "[bootstrap] Press ENTER to verify login and save (may not work until your profile page is visible)... "
+                )
                 try:
-                    page.wait_for_load_state('networkidle', timeout=5_000)
+                    page.wait_for_load_state("networkidle", timeout=5_000)
                     # Always navigate to /profile to check state after pressing ENTER
                     page.goto(f"{BASE_URL}/profile", timeout=30_000)
-                    page.wait_for_load_state('networkidle', timeout=10_000)
+                    page.wait_for_load_state("networkidle", timeout=10_000)
                 except Exception:
                     pass
                 try:
@@ -126,18 +139,26 @@ def run_login_flow(p: Playwright, profile: str, state_file: Path):
                         if is_logged_in(page):
                             break
                     except Exception:
-                        print("[bootstrap] Playwright navigation in progress. Please press ENTER again if your profile page is visible.")
+                        print(
+                            "[bootstrap] Playwright navigation in progress. Please press ENTER again if your profile page is visible."
+                        )
                         continue
-                print("[bootstrap] Still not logged in. Finish login (or navigate to your profile), then press ENTER again.")
+                print(
+                    "[bootstrap] Still not logged in. Finish login (or navigate to your profile), then press ENTER again."
+                )
         else:
             # Non-interactive mode for CI/CD (shouldn't be needed for manual use)
-            print("\n[bootstrap] No TTY detected. Auto-waiting up to 10 minutes for login...")
+            print(
+                "\n[bootstrap] No TTY detected. Auto-waiting up to 10 minutes for login..."
+            )
             try:
                 page.wait_for_url("**/profile/**", timeout=600_000)
-                page.wait_for_load_state('networkidle', timeout=15_000)
+                page.wait_for_load_state("networkidle", timeout=15_000)
             except PWTimeout:
                 save_artifacts(page, profile, "timeout")
-                raise TimeoutError("Login was not detected within the 10-minute window.")
+                raise TimeoutError(
+                    "Login was not detected within the 10-minute window."
+                )
 
         # Final verification before saving
         if not is_logged_in(page):
@@ -145,7 +166,9 @@ def run_login_flow(p: Playwright, profile: str, state_file: Path):
             raise RuntimeError("Login check failed. Refusing to save an invalid state.")
 
         ctx.storage_state(path=str(state_file))
-        print(f"\n✅ Successfully saved state for profile '{profile}' to: {state_file}\n")
+        print(
+            f"\n✅ Successfully saved state for profile '{profile}' to: {state_file}\n"
+        )
 
     finally:
         browser.close()
@@ -176,16 +199,18 @@ def main(profile_arg: str | None, force: bool):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Bootstrap Avito auth state for a test profile.")
+    parser = argparse.ArgumentParser(
+        description="Bootstrap Avito auth state for a test profile."
+    )
     parser.add_argument(
         "--profile",
         default=None,
-        help="The profile to bootstrap (e.g., 'profile1'). If not provided, uses last one."
+        help="The profile to bootstrap (e.g., 'profile1'). If not provided, uses last one.",
     )
     parser.add_argument(
         "--force",
         action="store_true",
-        help="Force re-authentication even if a valid state file exists."
+        help="Force re-authentication even if a valid state file exists.",
     )
     args = parser.parse_args()
     main(args.profile, args.force)

@@ -15,8 +15,12 @@ class HomePage:
     def __init__(self, page: Page) -> None:
         self.page = page
         # Stable locators from live DOM (per data-marker)
-        self._search_input: Locator = page.locator('[data-marker="search-form/suggest/input"]')
-        self._search_button: Locator = page.locator('[data-marker="search-form/submit-button"]')
+        self._search_input: Locator = page.locator(
+            '[data-marker="search-form/suggest/input"]'
+        )
+        self._search_button: Locator = page.locator(
+            '[data-marker="search-form/submit-button"]'
+        )
         # CORRECTED: wait for at least one ad title to appear (user sees this)
         self._first_ad_title: Locator = page.locator('[data-marker="item-title"]').first
         self._ad_title_locator: Locator = page.locator('[data-marker="item-title"]')
