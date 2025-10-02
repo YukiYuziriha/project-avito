@@ -1,0 +1,38 @@
+name: tests
+on: [push, pull_request]
+
+jobs:
+  static-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: ${{ runner.os }}-pip-
+
+      - name: Install Python deps
+        run: pip install -r requirements.txt
+
+      - name: Lint & format
+        run: |
+          ruff check .
+          ruff format --check .
+
+      - name: Type check
+        run: mypy .
+
+      - name: Validate test structure (no browser, no Avito contact)
+        run: pytest --collect-only tests/
+
+      - name: Run unit tests (POM contracts)
+        run: pytest tests/unit/ -v
