@@ -1,122 +1,176 @@
+```markdown
 # Avito UI Automation Framework
 
-A robust UI test automation framework in **Python** using **Playwright** and **Pytest** to validate key user workflows on **Avito.ru**, with CI via **GitHub Actions**.
+A robust, professional-grade UI test automation framework in **Python** using **Playwright** and **Pytest** to validate core user workflows on **Avito.ru**, with CI via **GitHub Actions**.
 
 ## Objectives
-- Prove a **maintainable, professional** automation system.
-- Cover **core end-to-end** user journeys.
-- Run reliably in **CI on every PR**, producing clear, developer-friendly feedback.
-- Demonstrate senior-level choices: clean architecture and professional delivery.
 
-## Project Plan
-- **Tooling:** Python, Playwright and Pytest with a Page Object Model architecture.
-- **Scenarios:** Buyer search & filter, seller post ad, buyer favourite & message seller.
-- **Data:** Small JSON datasets and fixtures for deterministic test users.
-- **CI:** GitHub Actions pipeline running tests on every pull request.
+- ✅ Prove a **maintainable, professional** automation system (not just scripts).
+- ✅ Cover **core end-to-end** user journeys that reflect real Avito usage.
+- ✅ Run reliably in **CI on every PR**, producing clear, developer-friendly feedback.
+- ✅ Demonstrate senior-level engineering: clean architecture, right tooling, and delivery discipline.
 
-## Current Status
-- Core page objects and fixtures are implemented in `pages/` and `conftest.py`.
-- Tests for the three core journeys live under `tests/` and run locally with a cached auth state.
-- GitHub Actions workflow (`.github/workflows/tests.yml`) executes non-auth tests on PRs.
-- Authentication bootstrap script (`tools/bootstrap_auth.py`) prepares session state for full E2E runs.
+## Current Scope (Phase 1 — P0 Complete)
 
----
+This project implements **one verified P0 user journey**:
+
+- **Buyer**: Search → open ad → view ad details
+
+> **Note**: Seller (post ad) and engagement (favorite & message) flows are **planned for Phase 2** and are **not part of current P0 scope**.
+
+## Tooling & Architecture
+
+- **Language**: Python 3.12+
+- **Framework**: Playwright (Chromium) + Pytest
+- **Pattern**: Page Object Model (POM) — tests express *what*, page objects implement *how*
+- **CI**: GitHub Actions (smoke tests on every PR)
+- **Auth**: Cached session state (manual bootstrap due to CAPTCHA/anti-bot)
 
 ## Local Development Setup
 
-This project requires a one-time manual authentication step to generate a local session file. This file is used by the test suite to bypass the UI login, which is often protected by CAPTCHA.
+This project requires a **one-time manual authentication step** to generate a local session file. This bypasses CAPTCHA-protected login during test runs.
 
-### **Step 1: Install Dependencies**
+### Step 1: Install Dependencies
 
-1.  Clone the repository and navigate to the project root.
-2.  Create and activate a virtual environment:
-    ```bash
-    python -m venv .venv
-    source .venv/bin/activate
-    ```
-3.  Install the required packages:
-    ```bash
-    pip install -r requirements.txt
-    playwright install --with-deps
-    ```
-### **Step 2: Create `.env` File**
+```bash
+# Clone and enter project
+git clone https://github.com/YukiYuziriha/project-avito.git
+cd project-avito
 
-Create a `.env` file in the project root by copying the `.env.example`. Fill it with your test account credentials using the scalable `PROFILEN` convention.
+# Virtual environment
+python -m venv .venv
+source .venv/bin/activate  # Linux/macOS
+# .\.venv\Scripts\activate  # Windows
+
+# Install deps
+pip install -r requirements.txt
+playwright install --with-deps
+```
+
+### Step 2: Configure `.env`
+
+Copy `.env.example` to `.env` and fill credentials for test profiles:
 
 ```ini
 # .env
-# Credentials for different test profiles
-AVITO_PROFILE1_USERNAME="<login_for_profile1>"
-AVITO_PROFILE1_PASSWORD="<password_for_profile1>"
+AVITO_PROFILE1_USERNAME="your_buyer_login"
+AVITO_PROFILE1_PASSWORD="your_buyer_password"
+```
 
-AVITO_PROFILE2_USERNAME="<login_for_profile2>"
-AVITO_PROFILE2_PASSWORD="<password_for_profile2>"
-````
+> 🔒 **Never commit `.env`** — it’s git-ignored.
 
-### **Step 3: Generate Authentication State**
+### Step 3: Bootstrap Authentication State
 
-Run the interactive bootstrap script to log in manually and save the session state. A browser window will open for you to solve any CAPTCHAs and enter SMS codes.
+Run the interactive script to log in manually (solve CAPTCHA/SMS):
 
-  * **To log in as `profile1`**:
-    ```bash
-    python tools/bootstrap_auth.py --profile profile1
-    ```
-  * **To re-authenticate even if the session is still valid**:
-    ```bash
-    python tools/bootstrap_auth.py --profile profile1 --force
-    ```
+```bash
+python tools/bootstrap_auth.py --profile profile1
+```
 
-The script will first check if a valid session already exists. If so, it will do nothing. After you log in, it saves a `profilename.json` file to the `.auth/` directory.
+This saves `.auth/profile1.json`, which tests reuse.
 
-### **Step 4: Run Tests**
+> ⚠️ **Automated login is impossible** due to Avito’s anti-bot protections. Manual bootstrap is the only reliable method.
 
-You can now run the Pytest suite. The tests will automatically use the cached authentication state, which is validated once per run.
+### Step 4: Run Tests
 
-  * **Run all tests**:
-    ```bash
-    pytest
-    ```
-  * **Run tests in parallel and in headed mode**:
-    ```bash
-    pytest -n auto --headed
-    ```
-  * **Run tests in a specific file**:
-    ```bash
-    pytest tests/test_search_filters.py
-    ```
+```bash
+# Run all tests (uses cached auth)
+pytest
 
------
+# Run smoke tests only
+pytest tests/smoke/
+
+# Run in headed mode (for debugging)
+pytest --headed
+
+# Run in parallel
+pytest -n auto
+```
+
+Auth-dependent tests automatically skip in CI (see `pytest.ini`).
+
+---
 
 ## Project Structure
 
 ```
-profile
-Qwen3-Max
-5:07 pm
-✅ Updated README Section: Project Structure
-Replace the existing Project Structure section in your README.md with this updated version:
-
-markdown
-
-
-1
-2
-## Project Structure
-
 .
-├── .auth/ # Stores cached authentication state (git-ignored)
-├── artifacts/ # Stores debug output like screenshots and traces (git-ignored)
-├── pages/ # Page Object Model files
+├── .auth/                 # Cached auth state (git-ignored)
+├── artifacts/             # Debug output: screenshots, traces (git-ignored)
+├── pages/                 # Page Objects (POM)
+│   ├── home_page.py       # Search, results interaction
+│   ├── ad_detail_page.py  # Ad title, price, location
+│   └── login_page.py      # Login form (used only in bootstrap)
 ├── tests/
-│ ├── smoke/ # Smoke tests (e.g., auth integration)
-│ └── <feature>/ # Feature-specific UI tests (e.g., search, messaging)
-├── test_data/ # Test data files (e.g., test_users.json)
-├── tools/ # Helper and utility scripts
-│ ├── bootstrap_auth.py # Interactive script to create auth state
-│ └── check_state.py # Utility to validate an existing auth state
-├── .env # Local environment variables (git-ignored)
-├── .env.example # Template for environment variables
-├── conftest.py # Pytest fixtures and test configuration
-├── pytest.ini # Pytest configuration
-└── requirements.txt # Project dependencies
+│   └── smoke/             # P0 smoke tests (auth integration)
+├── test_data/             # Test data (e.g., test_users.json)
+├── tools/
+│   ├── bootstrap_auth.py  # Interactive auth state creation
+│   └── check_state.py     # Validate saved session
+├── conftest.py            # Pytest fixtures (browser, login_factory)
+├── pytest.ini             # Test config (markers, timeouts)
+├── requirements.txt       # Dependencies
+├── .env.example           # Env template
+└── README.md              # You are here
+```
+
+---
+
+## Quality & Compliance
+
+- ✅ **POM-compliant**: No raw selectors in tests.
+- ✅ **Auth-safe**: Credentials never committed; session state reused.
+- ✅ **Flake-resistant**: Playwright auto-waits + explicit `expect` conditions.
+- ✅ **CI-ready**: Smoke tests run on every PR (`ui-smoke` marker).
+- ✅ **Documented**: This README covers setup, scope, and constraints.
+
+---
+
+## CI/CD (GitHub Actions)
+
+- **Trigger**: On every `pull_request` to `main`
+- **Jobs**: 
+  - Lint (`ruff`), type-check (`mypy`)
+  - Unit tests
+  - UI smoke tests (headless, with 1 retry)
+- **Artifacts**: Screenshots + HTML on failure (via `artifacts/`)
+- **Auth tests**: Skipped in CI using `pytest -m "not auth"`
+
+> 🔜 **Phase 2**: Enable full E2E suite in nightly runs with pre-seeded auth.
+
+---
+
+## P0 Verification
+
+| Requirement | Status |
+|-----------|--------|
+| Buyer: search → open ad → view details | ✅ Implemented |
+| Page Objects for core flows | ✅ `HomePage`, `AdDetailPage` |
+| Auth state management | ✅ Manual bootstrap + validation |
+| CI runs smoke tests on PRs | ✅ `ui-smoke` marker |
+| README with setup & scope | ✅ This document |
+
+---
+
+## Next Steps (Phase 2)
+
+- [ ] Implement **Seller: Post Ad** flow
+- [ ] Implement **Engagement: Favorite & Message**
+- [ ] Add `SearchResultsPage` if filter logic grows
+- [ ] Enable nightly full E2E runs in CI
+- [ ] Add `CONTRIBUTING.md`, `CODEOWNERS`, `CHANGELOG.md`
+
+---
+
+## Troubleshooting
+
+- **“Missing cached session”**: Run `bootstrap_auth.py` again.
+- **Test fails to find ad title**: Avito’s DOM may have changed — update selector in `HomePage`.
+- **CAPTCHA appears in bootstrap**: Complete it manually in the browser window.
+- **CI skips auth tests**: Expected. Run locally to validate full flow.
+
+---
+
+> **“A test is only as good as its ability to survive change.”**  
+> — This framework prioritizes **maintainability** over coverage breadth.
 ```
