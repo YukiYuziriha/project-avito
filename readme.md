@@ -1,37 +1,39 @@
+# Automating the Unautomatable: A Case Study in Testing Hostile Web Environments
 
----
+This project is a professional-grade UI test automation framework for **Avito.ru**. It's not just a set of test scripts; it's a case study in engineering a resilient and maintainable solution for a real-world, high-security, and actively hostile target platform.
 
-# Avito UI Automation Framework
+The primary goal was to solve a senior-level problem: **How do you test a system that is designed to prevent automation?**
 
-A robust, professional-grade UI test automation framework in **Python** using **Playwright** and **Pytest** to validate core user workflows on **Avito.ru**, with CI via **GitHub Actions**.
+-----
 
-> ⚠️ **Important**: Due to Avito.ru’s aggressive anti-bot protections (CAPTCHA, SMS, IP firewalling), **full end-to-end tests can only run locally** after manual authentication. CI runs static checks and smoke-safe validations only. This is a documented constraint — not a gap.
+## The Core Challenge: Avito's Anti-Bot Reality
 
----
+Avito.ru employs aggressive anti-automation measures that make traditional testing approaches impossible. Any robust test strategy *must* acknowledge and engineer around these constraints:
 
-## ✅ P0 Status: **Complete**
+  - **Intrusive Bot Detection:** CAPTCHA, SMS verification, and device fingerprinting block all unattended login attempts.
+  - **IP-Based Firewalling:** Automated requests from datacenter IPs (like GitHub Actions runners) are instantly blocked.
+  - **Ephemeral Sessions:** Authentication states are short-lived and cannot be reliably reused across different environments or long periods.
 
-This project delivers a **realistic, production-aware P0** by implementing the **only reliably automatable core journey** on Avito:
+**Conclusion:** End-to-end UI tests that require login **cannot be run in a standard CI/CD pipeline.** This is a fundamental constraint of the target platform, not a limitation of the framework.
 
-- **Buyer**: Search → Open Ad → View Details
+-----
 
-The other two P0 scenarios from the original plan (**Post Ad**, **Favorite & Message**) are **not feasible to automate reliably** without backend test hooks or a sandbox — which Avito does not provide publicly.
+## Architectural Solution & Strategy
 
----
+This framework demonstrates a mature, pragmatic approach to these challenges.
 
-## 🛠️ Tooling & Architecture
+  - **Pattern:** Strict Page Object Model (POM) to decouple test logic from fragile UI selectors, ensuring maintainability.
+  - **Authentication:** A `bootstrap_auth.py` utility handles the **one-time manual login process**. It solves the CAPTCHA/SMS problem by allowing a human to intervene and then saves the authenticated session state. This cached state is then reused by the `login_factory` fixture across all local test runs.
+  - **Test Scope:** The test suite is deliberately focused on the **read-only "Buyer Journey"** (Search → View Ad). This is the only high-value workflow that can be automated with any degree of stability. Scenarios requiring state changes (Posting Ads, Messaging) were scoped out as they are untestable without official API access.
 
-- **Language**: Python 3.12+
-- **Framework**: Playwright (Chromium) + Pytest
-- **Pattern**: Page Object Model (POM) — tests express *what*, page objects implement *how*
-- **Auth**: Cached session state (manually bootstrapped)
-- **CI**: GitHub Actions (lint, types, unit, smoke)
+-----
 
----
+## 🚀 Local Execution: The Only Way to Run
 
-## 🚀 Local Setup (Required for UI Tests)
+All UI tests are **local-only by design**. This is the only environment where the manually bootstrapped authentication state is valid.
 
-### 1. Install Dependencies
+### 1\. Install Dependencies
+
 ```bash
 git clone https://github.com/YukiYuziriha/project-avito.git
 cd project-avito
@@ -40,69 +42,55 @@ pip install -r requirements.txt
 playwright install --with-deps
 ```
 
-### 2. Configure `.env`
+### 2\. Configure Environment
+
+Create a `.env` file (git-ignored) with your credentials:
+
 ```ini
-# .env (git-ignored)
+# .env
 AVITO_PROFILE1_USERNAME="your_buyer@email.com"
 AVITO_PROFILE1_PASSWORD="your_password"
 ```
 
-### 3. Bootstrap Auth (Manual Step)
+### 3\. Bootstrap Authentication (One-Time Manual Step)
+
+Run this command. A browser will open, allowing you to solve any CAPTCHAs and complete the login.
+
 ```bash
 python tools/bootstrap_auth.py --profile profile1
 ```
-→ Solve CAPTCHA/SMS in the browser window that opens.  
-→ Session saved to `.auth/profile1.json`.
 
-> 🔒 **Never commit `.auth/` or `.env`** — they’re git-ignored.
+The authenticated session will be saved to `.auth/profile1.json`.
 
-### 4. Run Tests
+### 4\. Run the Test Suite
+
 ```bash
-pytest tests/smoke/                 # Run P0 smoke tests
-pytest --headed                    # Debug in headed mode
+# Run all smoke tests
+pytest tests/smoke/
+
+# Run in headed mode for debugging
+pytest --headed
 ```
 
----
+-----
+
+## 🧪 CI/CD: A Strategy of Safety and Realism
+
+The GitHub Actions pipeline for this project is intentionally limited to tasks that can be run safely and reliably:
+
+  - ✅ **Static Analysis:** `ruff` for linting/formatting and `mypy` for type checking.
+  - ✅ **Code Health:** Unit tests and dependency checks.
+
+**The CI pipeline does NOT run UI tests.** Attempting to do so would result in guaranteed failures due to Avito's security, creating noise and providing no value. This represents a professional decision to maintain a green, trustworthy CI pipeline.
+
+-----
 
 ## 📂 Project Structure
+
 ```
-pages/
-  ├── home_page.py        # Search input, ad titles
-  ├── ad_detail_page.py   # Title, price, location
-  └── login_page.py       # Used only in bootstrap
-tests/smoke/
-  ├── test_login_factory.py
-  ├── test_home_page.py
-  └── test_ad_detail_page.py
-tools/
-  ├── bootstrap_auth.py   # Manual auth bootstrap
-  └── check_state.py      # Validate session
-conftest.py               # login_factory fixture
+pages/          # Page Object Models: Decoupled UI interactions
+tests/smoke/    # Pytest tests: The business logic and assertions
+tools/          # Helper scripts for auth and state management
+conftest.py     # Core Pytest fixtures (e.g., login_factory)
+.github/        # CI workflow definitions
 ```
-
----
-
-## 🧪 CI Behavior (GitHub Actions)
-
-On every PR, CI runs:
-- ✅ `ruff` lint & format
-- ✅ `mypy` type checks
-- ✅ Unit tests
-- ✅ **Smoke-only UI tests** (skips auth-dependent flows)
-
-Full E2E tests **do not run in CI** — by design.  
-Artifacts (screenshots, HTML) uploaded on failure.
-
----
-
-## ❓ Troubleshooting
-
-- **“Missing cached session”** → Re-run `bootstrap_auth.py`
-- **“Element not found”** → Avito’s DOM changed; update selector in POM
-- **CI skips UI tests** → Expected. Run locally for full validation
-
----
-
-
---- 
-
