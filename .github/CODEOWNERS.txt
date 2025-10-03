@@ -1,0 +1,5 @@
+# .github/CODEOWNERS
+/pages/        @YukiYuziriha
+/tests/        @YukiYuziriha
+/.github/workflows/ @YukiYuziriha
+/conftest.py   @YukiYuziriha
